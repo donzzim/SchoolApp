@@ -4,7 +4,7 @@ using School.Domain.Entities;
 
 namespace School.Infra.Data.EntitiesConfiguration;
 
-public class CourseConfiguration: IEntityTypeConfiguration<Course>
+public class CourseConfiguration : IEntityTypeConfiguration<Course>
 {
     public void Configure(EntityTypeBuilder<Course> builder)
     {

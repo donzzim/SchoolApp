@@ -1,32 +1,53 @@
-﻿using School.Domain.Entities;
+﻿using Microsoft.EntityFrameworkCore;
+using School.Domain.Entities;
 using School.Domain.Interfaces;
+using School.Infra.Data.Context;
 
 namespace School.Infra.Data.Repositories;
 
 public class CourseRepository : ICourseRepository
 {
-    public Task<Course> GetByIdAsync(int id)
+    private readonly ApplicationDbContext _context;
+
+    public CourseRepository(ApplicationDbContext context)
     {
-        throw new NotImplementedException();
+        _context = context;
+    }
+    public async Task<Course> GetByIdAsync(int id)
+    {
+        return await _context.Course.FindAsync(id);
     }
 
-    public Task<List<Course>> GetAllAsync()
+    public async Task<List<Course>> GetAllAsync()
     {
-        throw new NotImplementedException();
+        return await _context.Course.ToListAsync();
     }
 
-    public Task<Course> AddAsync(Course course)
+    public async Task<Course> AddAsync(Course course)
     {
-        throw new NotImplementedException();
+        _context.Course.Add(course);
+        await _context.SaveChangesAsync();
+        return course;
     }
 
-    public Task<Course> UpdateAsync(Course course)
+    public async Task<Course> UpdateAsync(Course course)
     {
-        throw new NotImplementedException();
+        _context.Course.Update(course);
+        await _context.SaveChangesAsync();
+        return course;
     }
 
-    public Task<Course> DeleteAsync(int id)
+    public async Task<Course> DeleteAsync(int id)
     {
-        throw new NotImplementedException();
+        var course = await _context.Course.FindAsync(id);
+        if (course == null)
+        {
+            return null;
+        }
+
+        course.Deleted = true;
+        _context.Course.Update(course);
+        await _context.SaveChangesAsync();
+        return course;
     }
 }

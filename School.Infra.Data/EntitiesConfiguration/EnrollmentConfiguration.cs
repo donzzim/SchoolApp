@@ -4,7 +4,7 @@ using School.Domain.Entities;
 
 namespace School.Infra.Data.EntitiesConfiguration;
 
-public class EnrollmentConfiguration: IEntityTypeConfiguration<Enrollment>
+public class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollment>
 {
     public void Configure(EntityTypeBuilder<Enrollment> builder)
     {
@@ -12,6 +12,12 @@ public class EnrollmentConfiguration: IEntityTypeConfiguration<Enrollment>
         builder.Property(x => x.UserId)
             .IsRequired();
         builder.Property(x => x.ClassId)
+            .IsRequired();
+        builder.Property(x => x.EnrollmentDate)
+            .IsRequired();
+        builder.Property(x => x.ExpirationDate)
+            .IsRequired();
+        builder.Property(x => x.IsActive)
             .IsRequired();
         builder.HasOne(x => x.User)
             .WithMany(x => x.Enrollments)
