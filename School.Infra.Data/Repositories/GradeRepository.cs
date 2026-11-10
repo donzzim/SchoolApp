@@ -46,7 +46,8 @@ public class GradeRepository : IGradeRepository
             return null;
         }
 
-        _context.Grade.Remove(entity);
+        entity.Deleted = true;
+        _context.Grade.Update(entity);
         await _context.SaveChangesAsync();
         return entity;
     }

@@ -11,6 +11,8 @@ public class GradeConfiguration : IEntityTypeConfiguration<Grade>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.GradeValue)
             .IsRequired();
+        builder.Property(x => x.DateGrade)
+            .IsRequired();
         builder.Property(x => x.EnrollmentId)
             .IsRequired();
 

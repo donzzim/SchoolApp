@@ -1,8 +1,9 @@
-﻿namespace School.Domain.Entities;
+namespace School.Domain.Entities;
 
 public class User
 {
     public int Id { get; set; }
+    public bool Deleted { get; set; }
     public string? Name { get; set; }
     public string? Email { get; set; }
     public byte[]? PasswordHash { get; set; }

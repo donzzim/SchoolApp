@@ -1,8 +1,9 @@
-﻿namespace School.Domain.Entities;
+namespace School.Domain.Entities;
 
 public class Enrollment
 {
     public int Id { get; set; }
+    public bool Deleted { get; set; }
     public int UserId { get; set; }
     public int ClassId { get; set; }
     public DateTime EnrollmentDate  { get; set; }

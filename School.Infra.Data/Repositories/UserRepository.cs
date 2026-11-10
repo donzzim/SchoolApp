@@ -46,7 +46,8 @@ public class UserRepository : IUserRepository
             return null;
         }
 
-        _context.User.Remove(entity);
+        entity.Deleted = true;
+        _context.User.Update(entity);
         await _context.SaveChangesAsync();
         return entity;
     }

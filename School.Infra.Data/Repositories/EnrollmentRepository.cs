@@ -46,7 +46,8 @@ public class EnrollmentRepository : IEnrollmentRepository
             return null;
         }
 
-        _context.Enrollment.Remove(entity);
+        entity.Deleted = true;
+        _context.Enrollment.Update(entity);
         await _context.SaveChangesAsync();
         return entity;
     }

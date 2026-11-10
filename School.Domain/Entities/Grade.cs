@@ -1,11 +1,13 @@
-﻿namespace School.Domain.Entities;
+namespace School.Domain.Entities;
 
 public class Grade
 {
     public int Id { get; set; }
+    public bool Deleted { get; set; }
     public int CourseId { get; set; }
     public int EnrollmentId { get; set; }
     public int GradeValue { get; set; }
+    public DateTime DateGrade { get; set; }
     public Enrollment? Enrollment { get; set; }
     public bool IsApproved { get; set; }
     public Course? Course { get; set; }

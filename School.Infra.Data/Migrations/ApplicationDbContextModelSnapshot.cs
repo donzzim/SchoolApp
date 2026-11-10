@@ -33,6 +33,9 @@ namespace School.Infra.Data.Migrations
                     b.Property<int>("CourseId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -86,6 +89,9 @@ namespace School.Infra.Data.Migrations
                     b.Property<int>("ClassId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("EnrollmentDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -118,6 +124,12 @@ namespace School.Infra.Data.Migrations
                     b.Property<int>("CourseId")
                         .HasColumnType("integer");
 
+                    b.Property<DateTime>("DateGrade")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("EnrollmentId")
                         .HasColumnType("integer");
 
@@ -143,6 +155,9 @@ namespace School.Infra.Data.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Email")
                         .IsRequired()

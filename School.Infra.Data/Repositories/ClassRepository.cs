@@ -46,7 +46,8 @@ public class ClassRepository : IClassRepository
             return null;
         }
 
-        _context.Classes.Remove(entity);
+        entity.Deleted = true;
+        _context.Classes.Update(entity);
         await _context.SaveChangesAsync();
         return entity;
     }
