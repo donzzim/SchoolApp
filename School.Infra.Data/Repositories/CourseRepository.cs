@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using School.Domain.Entities;
 using School.Domain.Interfaces;
 using School.Infra.Data.Context;
@@ -13,7 +13,7 @@ public class CourseRepository : ICourseRepository
     {
         _context = context;
     }
-    public async Task<Course> GetByIdAsync(int id)
+    public async Task<Course?> GetByIdAsync(int? id)
     {
         return await _context.Course.FindAsync(id);
     }
@@ -37,7 +37,7 @@ public class CourseRepository : ICourseRepository
         return course;
     }
 
-    public async Task<Course> DeleteAsync(int id)
+    public async Task<Course?> DeleteAsync(int id)
     {
         var course = await _context.Course.FindAsync(id);
         if (course == null)

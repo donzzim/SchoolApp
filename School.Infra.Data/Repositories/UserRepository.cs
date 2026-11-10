@@ -1,32 +1,53 @@
-﻿using School.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using School.Domain.Entities;
 using School.Domain.Interfaces;
+using School.Infra.Data.Context;
 
 namespace School.Infra.Data.Repositories;
 
 public class UserRepository : IUserRepository
 {
-    public Task<User> GetByIdAsync(int id)
+    private readonly ApplicationDbContext _context;
+
+    public UserRepository(ApplicationDbContext context)
     {
-        throw new NotImplementedException();
+        _context = context;
     }
 
-    public Task<List<User>> GetAllAsync()
+    public async Task<User?> GetByIdAsync(int id)
     {
-        throw new NotImplementedException();
+        return await _context.User.FindAsync(id);
     }
 
-    public Task<User> AddAsync(User user)
+    public async Task<List<User>> GetAllAsync()
     {
-        throw new NotImplementedException();
+        return await _context.User.ToListAsync();
     }
 
-    public Task<User> UpdateAsync(User user)
+    public async Task<User> AddAsync(User user)
     {
-        throw new NotImplementedException();
+        _context.User.Add(user);
+        await _context.SaveChangesAsync();
+        return user;
     }
 
-    public Task<User> DeleteAsync(int id)
+    public async Task<User> UpdateAsync(User user)
     {
-        throw new NotImplementedException();
+        _context.User.Update(user);
+        await _context.SaveChangesAsync();
+        return user;
+    }
+
+    public async Task<User?> DeleteAsync(int id)
+    {
+        var entity = await _context.User.FindAsync(id);
+        if (entity == null)
+        {
+            return null;
+        }
+
+        _context.User.Remove(entity);
+        await _context.SaveChangesAsync();
+        return entity;
     }
 }

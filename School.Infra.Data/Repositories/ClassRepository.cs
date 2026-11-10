@@ -1,32 +1,53 @@
-﻿using School.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using School.Domain.Entities;
 using School.Domain.Interfaces;
+using School.Infra.Data.Context;
 
 namespace School.Infra.Data.Repositories;
 
 public class ClassRepository : IClassRepository
 {
-    public Task<Class> GetByIdAsync(int id)
+    private readonly ApplicationDbContext _context;
+
+    public ClassRepository(ApplicationDbContext context)
     {
-        throw new NotImplementedException();
+        _context = context;
     }
 
-    public Task<List<Class>> GetAllAsync()
+    public async Task<Class?> GetByIdAsync(int id)
     {
-        throw new NotImplementedException();
+        return await _context.Classes.FindAsync(id);
     }
 
-    public Task<Class> AddAsync(Class c)
+    public async Task<List<Class>> GetAllAsync()
     {
-        throw new NotImplementedException();
+        return await _context.Classes.ToListAsync();
     }
 
-    public Task<Class> UpdateAsync(Class c)
+    public async Task<Class> AddAsync(Class c)
     {
-        throw new NotImplementedException();
+        _context.Classes.Add(c);
+        await _context.SaveChangesAsync();
+        return c;
     }
 
-    public Task<Class> DeleteAsync(int id)
+    public async Task<Class> UpdateAsync(Class c)
     {
-        throw new NotImplementedException();
+        _context.Classes.Update(c);
+        await _context.SaveChangesAsync();
+        return c;
+    }
+
+    public async Task<Class?> DeleteAsync(int id)
+    {
+        var entity = await _context.Classes.FindAsync(id);
+        if (entity == null)
+        {
+            return null;
+        }
+
+        _context.Classes.Remove(entity);
+        await _context.SaveChangesAsync();
+        return entity;
     }
 }

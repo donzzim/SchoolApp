@@ -1,32 +1,53 @@
-﻿using School.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
+using School.Domain.Entities;
 using School.Domain.Interfaces;
+using School.Infra.Data.Context;
 
 namespace School.Infra.Data.Repositories;
 
 public class GradeRepository : IGradeRepository
 {
-    public Task<Grade> GetByIdAsync(int id)
+    private readonly ApplicationDbContext _context;
+
+    public GradeRepository(ApplicationDbContext context)
     {
-        throw new NotImplementedException();
+        _context = context;
     }
 
-    public Task<List<Grade>> GetAllAsync()
+    public async Task<Grade?> GetByIdAsync(int id)
     {
-        throw new NotImplementedException();
+        return await _context.Grade.FindAsync(id);
     }
 
-    public Task<Grade> AddAsync(Grade grade)
+    public async Task<List<Grade>> GetAllAsync()
     {
-        throw new NotImplementedException();
+        return await _context.Grade.ToListAsync();
     }
 
-    public Task<Grade> UpdateAsync(Grade grade)
+    public async Task<Grade> AddAsync(Grade grade)
     {
-        throw new NotImplementedException();
+        _context.Grade.Add(grade);
+        await _context.SaveChangesAsync();
+        return grade;
     }
 
-    public Task<Grade> DeleteAsync(int id)
+    public async Task<Grade> UpdateAsync(Grade grade)
     {
-        throw new NotImplementedException();
+        _context.Grade.Update(grade);
+        await _context.SaveChangesAsync();
+        return grade;
+    }
+
+    public async Task<Grade?> DeleteAsync(int id)
+    {
+        var entity = await _context.Grade.FindAsync(id);
+        if (entity == null)
+        {
+            return null;
+        }
+
+        _context.Grade.Remove(entity);
+        await _context.SaveChangesAsync();
+        return entity;
     }
 }
