@@ -31,8 +31,8 @@ A separação é uma arquitetura em camadas com inversão de dependência: a apl
 | `School.API/appsettings*.json` | Configurações por ambiente. Credenciais reais devem ficar fora do Git. |
 | `School.Application/DTO` | Contratos de entrada e saída, separados por entidade e operação. |
 | `School.Application/Interfaces` | Contratos dos casos de uso, como `ICourseService`. |
-| `School.Application/Services` | Validação, regras, mapeamento entre entidades e DTOs e coordenação dos repositórios. `ServiceValidation` compartilha a validação básica. |
-| `School.Domain/Entities` | Modelo escolar: Course, Class, User, Enrollment e Grade. |
+| `School.Application/Services` | Mapeamento explícito entre entidades e DTOs e coordenação dos repositórios. ServiceValidation permanece disponível, mas não é chamado pelos serviços atuais. |
+| `School.Domain/Entities` | Modelo escolar: Course, SchoolClass, User, Enrollment e Grade. |
 | `School.Domain/Interfaces` | Contratos dos repositórios. Definem o que a aplicação precisa armazenar e consultar. |
 | `School.Infra.Data/Context` | `ApplicationDbContext`: sessão de acesso ao banco, DbSets e aplicação dos mapeamentos. |
 | `School.Infra.Data/EntitiesConfiguration` | Fluent API: chaves, limites, obrigatoriedade, relacionamentos e comportamento de exclusão física. |
@@ -48,12 +48,12 @@ Referências de projeto: `Application → Domain`; `Infra.Data → Domain`; `Inf
 ## Modelo escolar
 
 - **Course**: curso com nome e descrição; possui turmas.
-- **Class**: turma vinculada a um curso por `CourseId`.
+- **SchoolClass**: turma vinculada a um curso por `CourseId`. Matrículas usam SchoolClassId e a navegação SchoolClass; cursos e o DbContext usam a coleção SchoolClasses.
 - **User**: usuário com nome, e-mail, perfil e dados derivados da senha.
 - **Enrollment**: matrícula que associa usuário e turma, com início, expiração e indicador de atividade.
 - **Grade**: nota vinculada à matrícula e ao curso, com data de avaliação e aprovação.
 
-`Id` é a chave primária. Campos como `CourseId` são chaves estrangeiras. Propriedades de navegação como `Course` e `Enrollments` permitem representar os relacionamentos em objetos; elas não são automaticamente carregadas por todas as consultas. Os DTOs atuais retornam campos escalares para evitar ciclos e exposição desnecessária.
+`Id` é a chave primária. Campos como `CourseId` são chaves estrangeiras. Propriedades de navegação como `Course` e `Enrollments` permitem representar os relacionamentos em objetos; elas não são automaticamente carregadas por todas as consultas. Os DTOs comuns retornam campos escalares; os DTOs detalhados de turma e matrícula incluem objetos de leitura dos relacionamentos.
 
 ## Entidade, DTO, interface, serviço e repositório
 
@@ -63,36 +63,32 @@ Uma **interface** define um contrato. `ICourseService` descreve os casos de uso;
 
 ### Métodos dos serviços
 
-Todos os serviços seguem o mesmo contrato:
+Os serviços seguem o padrão de EnrollmentService: recebem os DTOs, criam entidades com inicializadores, chamam o repositório e montam explicitamente o DTO de resposta em cada operação.
 
 | Método | Comportamento |
 | --- | --- |
-| `GetByIdAsync(id)` | Exige ID positivo; devolve DTO ou `null` se ausente/excluído. |
-| `GetAllAsync()` | Devolve lista de DTOs dos registros não excluídos; pode ser vazia. |
-| `AddAsync(dto)` | Valida entrada e vínculos aplicáveis, cria entidade e retorna o DTO persistido. |
-| `UpdateAsync(dto)` | Valida entrada, busca entidade existente e altera os campos permitidos. Retorna `null` se ausente/excluída. |
-| `DeleteAsync(id)` | Exige ID positivo e chama o repositório para marcar `Deleted = true`. Retorna `null` se ausente/já excluída. |
+| GetByIdAsync(id) | Consulta o repositório e retorna DTO ou null quando ausente. Turmas e matrículas retornam DTOs detalhados com relacionamentos. |
+| GetAllAsync() | Mapeia os registros devolvidos pelo repositório para uma lista de DTOs, sem filtro adicional no serviço. Matrículas usam EnrollmentGetDetailDto. |
+| AddAsync(dto) | Cria a entidade a partir do DTO e retorna os valores persistidos. |
+| UpdateAsync(dto) | Cria uma entidade com os campos de entrada e delega a atualização ao repositório. Usuários recebem o ID separadamente: UpdateAsync(userId, dto). |
+| DeleteAsync(id) | Delega a exclusão ao repositório e retorna DTO ou null. |
 
-`Task<T>` representa um resultado assíncrono. `await` permite aguardar I/O sem bloquear a thread durante a espera. O sufixo `Async` comunica essa característica. `ToDto` centraliza o mapeamento de saída; `Select` aplica esse mapeamento a cada elemento e `Where` filtra registros excluídos.
+Task e await representam operações assíncronas de acesso à persistência. As respostas são construídas com os dados devolvidos pelo repositório, inclusive IDs gerados.
 
-### Validações e regras implementadas
+### Mapeamento e regras atuais
 
-- Data Annotations (`Required`, `MaxLength`, `Range`, `EmailAddress`, `MinLength`) validam os DTOs. Os serviços chamam `Validator.ValidateObject`, portanto a validação também ocorre fora de um controller.
-- Nomes e descrições são aparados com `Trim`. IDs precisam ser positivos. Campos obrigatórios não aceitam texto em branco.
-- Turmas exigem um curso existente e não excluído.
-- Matrículas exigem usuário e turma existentes e não excluídos. A expiração deve ser posterior à matrícula, e ambas as datas devem estar em UTC.
-- Notas exigem curso e matrícula existentes e não excluídos; o curso deve corresponder ao curso da turma da matrícula. A nota não pode ser negativa e a data de avaliação deve ser válida e UTC.
-- Não foi definida uma escala máxima de notas nem uma média de aprovação. `IsApproved` continua sendo informado pelo chamador. `IsActive` também é explícito, sem cálculo automático pela data.
-- Usuários exigem e-mail válido, perfil e senha de no mínimo oito caracteres na criação. Na atualização, `Password = null` preserva a senha; uma nova senha passa pela mesma validação mínima.
-- Senhas usam PBKDF2-SHA256 com 600.000 iterações, salt aleatório de 16 bytes e hash de 32 bytes. Os DTOs de leitura não retornam senha, hash ou salt. Isso ainda não implementa login nem controle de permissões sobre `Profile`.
+- Os serviços não executam Data Annotations, normalização com Trim ou validação geral de IDs e vínculos. As anotações continuam nos DTOs para validação na futura camada HTTP; chamadas diretas não as executam automaticamente.
+- Turmas associam CourseId; a consulta individual retorna SchoolClassGetDetailDto com o curso. O repositório carrega essa navegação com Include.
+- Matrículas geram EnrollmentDate em UTC e começam com IsActive igual a true. O serviço de referência recebe apenas o repositório de matrículas e retorna usuário e turma nas consultas detalhadas. O repositório carrega essas navegações.
+- Na atualização, notas derivam CourseId pela matrícula e sua turma (SchoolClassId). A ausência desses vínculos gera InvalidOperationException. A criação atual gera DateGrade com DateTime.Now e define IsApproved quando GradeValue é maior ou igual a 60.
+- Usuários recebem perfil Student na criação. UpdateAsync recebe userId separado do DTO. Criação e atualização geram hash PBKDF2-SHA256 com 600.000 iterações, salt aleatório de 16 bytes e hash de 32 bytes. As leituras não retornam credenciais.
+- Os repositórios de curso, turma, usuário e nota buscam a entidade existente durante a atualização e alteram somente os campos permitidos; retornam null quando ausente. Isso preserva Deleted, perfil do usuário, data e aprovação da nota. O EnrollmentService e sua atualização de referência foram preservados; seu repositório ainda usa Update da entidade recebida, que grava também os valores padrão dos campos omitidos.
 
-Entradas inválidas geram `ValidationException`, IDs inválidos geram `ArgumentOutOfRangeException` e argumentos nulos geram `ArgumentNullException`. Essas exceções ainda não são convertidas globalmente em respostas HTTP. Falhas de infraestrutura também não devem ser expostas com detalhes internos ao cliente.
+### Exclusão lógica e limitações
 
-### Exclusão lógica
+Os repositórios marcam Deleted como true. Seguindo o serviço de referência, os serviços retornam os registros fornecidos pelo repositório, sem ocultar excluídos nem bloquear sua atualização. Uma política uniforme de filtragem e validação permanece como evolução futura.
 
-Excluir marca `Deleted = true`, preservando a linha no banco. Os serviços ocultam esses registros nas consultas e impedem sua atualização. Os repositórios atuais ainda consultam todas as linhas; o filtro da listagem ocorre em memória no serviço. Uma evolução para grandes volumes é filtrar no banco e paginar.
-
-A exclusão lógica não exclui automaticamente registros relacionados. Excluir um curso, por exemplo, não exclui suas turmas. As validações verificam os vínculos diretos descritos acima; não existe uma política completa de propagação ou bloqueio de exclusões. Essa política deve ser definida antes de ampliar as regras.
+As exceções ainda não são convertidas globalmente em respostas HTTP. Não há controllers escolares, autenticação, autorização nem política completa de exclusão de relacionamentos.
 
 ## Injeção de dependência e pipeline
 
@@ -145,10 +141,14 @@ dotnet ef database update --project School.Infra.Data --startup-project School.A
 dotnet run --project School.Application.Tests
 ```
 
-O executável retorna erro se uma verificação falhar. Cobre validações, atualização, exclusão lógica nos cinco serviços, vínculos entre curso/turma/matrícula/nota e geração/preservação/troca da senha. Não acessa PostgreSQL e não substitui testes de integração ou HTTP.
+O executável retorna erro se uma verificação falhar. ServiceChecks.cs verifica mapeamentos, consultas detalhadas, retornos ausentes, delegação ao repositório e geração de hash com repositórios em memória. Não acessa PostgreSQL e não substitui testes de integração ou HTTP.
 
 ## Manutenção deste guia
 
 Este é um documento vivo, atualizado junto das mudanças do projeto; não existe geração automática deste arquivo. Cada alteração de arquitetura, pasta, contrato, regra, endpoint ou configuração deve incluir a revisão da seção correspondente. Descreva como implementado apenas o que o código já faz e mantenha propostas claramente identificadas.
 
 Na validação desta implementação, a compilação apontou avisos já presentes: conflito entre versões transitivas de `Microsoft.EntityFrameworkCore.Relational` e vulnerabilidade reportada pelo NuGet em `Microsoft.OpenApi` 2.0.0. A atualização/alinhamento dessas dependências permanece pendente. A compilação não substitui testes de integração com PostgreSQL.
+
+A migration RenameClassToSchoolClass renomeia a tabela Classes para SchoolClasses e a coluna ClassId para SchoolClassId, com seus índices e restrições, preservando os registros. As migrations anteriores mantêm os nomes históricos. Para atualizar um banco existente, execute dotnet ef database update --project School.Infra.Data --startup-project School.API; as migrations de renomeação foram aplicadas com sucesso ao banco configurado nesta execução.
+
+O nome final da tabela é SchoolClass (singular), definido explicitamente por ToTable em SchoolClassConfiguration. A migration UseSchoolClassTableName renomeia SchoolClasses para SchoolClass e ajusta as restrições e o índice; o DbSet e as coleções em C# permanecem SchoolClasses. As duas migrations de renomeação foram aplicadas com dotnet ef database update --project School.Infra.Data --startup-project School.API, preservando os registros existentes.

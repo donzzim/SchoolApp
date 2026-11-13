@@ -31,11 +31,15 @@ public class GradeRepository : IGradeRepository
         return grade;
     }
 
-    public async Task<Grade> UpdateAsync(Grade grade)
+    public async Task<Grade?> UpdateAsync(Grade grade)
     {
-        _context.Grade.Update(grade);
+        var existing = await _context.Grade.FindAsync(grade.Id);
+        if (existing == null) return null;
+        existing.EnrollmentId = grade.EnrollmentId;
+        existing.CourseId = grade.CourseId;
+        existing.GradeValue = grade.GradeValue;
         await _context.SaveChangesAsync();
-        return grade;
+        return existing;
     }
 
     public async Task<Grade?> DeleteAsync(int id)

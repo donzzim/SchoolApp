@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using School.Domain.Entities;
 
 namespace School.Infra.Data.Context;
@@ -12,7 +12,7 @@ public class ApplicationDbContext : DbContext
     }
 
     public DbSet<Course> Course { get; set; }
-    public DbSet<Class> Classes { get; set; }
+    public DbSet<SchoolClass> SchoolClasses { get; set; }
     public DbSet<Grade> Grade { get; set; }
     public DbSet<Enrollment> Enrollment { get; set; }
     public DbSet<User> User { get; set; }

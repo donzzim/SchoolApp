@@ -1,4 +1,7 @@
+using System.Security.Cryptography;
+using System.Text;
 using School.Application.DTO.User;
+
 using School.Application.Interfaces;
 using School.Domain.Entities;
 using School.Domain.Interfaces;
@@ -7,71 +10,89 @@ namespace School.Application.Services;
 
 public class UserService : IUserService
 {
-    private readonly IUserRepository _repository;
+    private readonly IUserRepository _userRepository;
 
-    public UserService(IUserRepository repository)
+    public UserService(IUserRepository userRepository)
     {
-        ArgumentNullException.ThrowIfNull(repository);
-        _repository = repository;
+        _userRepository = userRepository;
+
     }
 
     public async Task<UserGetDto?> GetByIdAsync(int id)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
-        var entity = await _repository.GetByIdAsync(id);
-        return entity is null || entity.Deleted ? null : ToDto(entity);
+        var user = await _userRepository.GetByIdAsync(id);
+        if (user == null) return null;
+        return new UserGetDto
+        {
+            Id = user.Id,
+            Name = user.Name,
+            Email = user.Email,
+        };
     }
 
     public async Task<List<UserGetDto>> GetAllAsync()
     {
-        var entities = await _repository.GetAllAsync();
-        return entities.Where(entity => !entity.Deleted).Select(ToDto).ToList();
+        var entities = await _userRepository.GetAllAsync();
+        var result = new List<UserGetDto>();
+        result.AddRange(entities.Select(user => new UserGetDto
+        {
+            Id = user.Id,
+            Name = user.Name,
+            Email = user.Email,
+        }));
+        return result;
     }
 
     public async Task<UserGetDto> AddAsync(UserPostDto dto)
     {
-        ServiceValidation.Validate(dto);
-        var entity = new User();
-        entity.Name = dto.Name!.Trim();
-        entity.Email = dto.Email!.Trim();
-        entity.Profile = dto.Profile!.Trim();
-        if (dto.Password is not null) SetPassword(entity, dto.Password);
-        return ToDto(await _repository.AddAsync(entity));
+        using var hmac = new HMACSHA512();
+        byte[] passwordHash = hmac.ComputeHash(Encoding.UTF8.GetBytes(dto.Password));
+        byte[] passwordSalt = hmac.Key;
+
+        var user = new User
+        {
+            Name = dto.Name,
+            Email = dto.Email,
+            Deleted = false,
+            PasswordHash = passwordHash,
+            PasswordSalt = passwordSalt,
+            Profile = "Student"
+        };
+        var saved = await _userRepository.AddAsync(user);
+
+        return new UserGetDto
+        {
+            Id = saved.Id,
+            Name = saved.Name,
+            Email = saved.Email,
+        };
     }
 
-    public async Task<UserGetDto?> UpdateAsync(UserPutDto dto)
+    public async Task<UserGetDto?> UpdateAsync(int userId, UserPutDto dto)
     {
-        ServiceValidation.Validate(dto);
-        var entity = await _repository.GetByIdAsync(dto.Id);
-        if (entity is null || entity.Deleted) return null;
-        entity.Name = dto.Name!.Trim();
-        entity.Email = dto.Email!.Trim();
-        entity.Profile = dto.Profile!.Trim();
-        if (dto.Password is not null) SetPassword(entity, dto.Password);
-        return ToDto(await _repository.UpdateAsync(entity));
+        var user = await _userRepository.GetByIdAsync(userId);
+        if (user == null) return null;
+        user.Name = dto.Name;
+        user.Email = dto.Email;
+        var updatedUser =  await _userRepository.UpdateAsync(user);
+        return new UserGetDto
+        {
+            Id = updatedUser.Id,
+            Name = updatedUser.Name,
+            Email = updatedUser.Email,
+
+        };
     }
 
     public async Task<UserGetDto?> DeleteAsync(int id)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
-        var entity = await _repository.GetByIdAsync(id);
-        if (entity is null || entity.Deleted) return null;
-        var deleted = await _repository.DeleteAsync(id);
-        return deleted is null ? null : ToDto(deleted);
+        var deleted = await _userRepository.DeleteAsync(id);
+        if (deleted == null) return null;
+        return new UserGetDto
+        {
+            Id = deleted.Id,
+            Name = deleted.Name,
+            Email = deleted.Email,
+        };
     }
-
-    private static void SetPassword(User user, string password)
-    {
-        user.PasswordSalt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
-        user.PasswordHash = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
-            password, user.PasswordSalt, 600_000, System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
-    }
-
-    private static UserGetDto ToDto(User entity) => new()
-    {
-        Id = entity.Id,
-        Name = entity.Name,
-        Email = entity.Email,
-        Profile = entity.Profile
-    };
 }

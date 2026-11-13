@@ -19,12 +19,12 @@ public static class DependencyInjection
         });
 
         services.AddScoped<ICourseService, CourseService>();
-        services.AddScoped<IClassService, ClassService>();
+        services.AddScoped<ISchoolClassService, SchoolClassService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IEnrollmentService, EnrollmentService>();
         services.AddScoped<IGradeService, GradeService>();
         services.AddScoped<ICourseRepository, CourseRepository>();
-        services.AddScoped<IClassRepository, ClassRepository>();
+        services.AddScoped<ISchoolClassRepository, SchoolClassRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
         services.AddScoped<IGradeRepository, GradeRepository>();

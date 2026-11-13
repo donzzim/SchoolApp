@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using School.Domain.Entities;
 
@@ -11,7 +11,7 @@ public class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollment>
         builder.HasKey(x => x.Id);
         builder.Property(x => x.UserId)
             .IsRequired();
-        builder.Property(x => x.ClassId)
+        builder.Property(x => x.SchoolClassId)
             .IsRequired();
         builder.Property(x => x.EnrollmentDate)
             .IsRequired();
@@ -23,9 +23,9 @@ public class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollment>
             .WithMany(x => x.Enrollments)
             .HasForeignKey(x => x.UserId)
             .OnDelete(DeleteBehavior.NoAction);
-        builder.HasOne(x => x.Class)
+        builder.HasOne(x => x.SchoolClass)
             .WithMany(x => x.Enrollments)
-            .HasForeignKey(x => x.ClassId)
+            .HasForeignKey(x => x.SchoolClassId)
             .OnDelete(DeleteBehavior.NoAction);
     }
 }

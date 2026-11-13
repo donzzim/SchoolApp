@@ -1,4 +1,6 @@
+using School.Application.DTO.SchoolClass;
 using School.Application.DTO.Enrollment;
+using School.Application.DTO.User;
 using School.Application.Interfaces;
 using School.Domain.Entities;
 using School.Domain.Interfaces;
@@ -7,86 +9,127 @@ namespace School.Application.Services;
 
 public class EnrollmentService : IEnrollmentService
 {
-    private readonly IEnrollmentRepository _repository;
-    private readonly IUserRepository _userRepository;
-    private readonly IClassRepository _classRepository;
+    private readonly IEnrollmentRepository _enrollmentRepository;
 
-    public EnrollmentService(IEnrollmentRepository repository, IUserRepository userRepository, IClassRepository classRepository)
+    public EnrollmentService(IEnrollmentRepository enrollmentRepository)
     {
-        ArgumentNullException.ThrowIfNull(repository);
-        _repository = repository;
-        ArgumentNullException.ThrowIfNull(userRepository);
-        _userRepository = userRepository;
-        ArgumentNullException.ThrowIfNull(classRepository);
-        _classRepository = classRepository;
+        _enrollmentRepository = enrollmentRepository;
+    }
+    public async Task<EnrollmentGetDetailDto?> GetByIdAsync(int id)
+    {
+        var enrollment = await _enrollmentRepository.GetByIdAsync(id);
+        if (enrollment == null)
+        {
+            return null;
+        }
+
+        return new EnrollmentGetDetailDto
+        {
+            Id = enrollment.Id,
+            EnrollmentDate = enrollment.EnrollmentDate,
+            EnrollmentExpiration = enrollment.ExpirationDate,
+            IsActive = enrollment.IsActive,
+            User = new UserGetDto
+            {
+                Id = enrollment.User.Id,
+                Name = enrollment.User.Name,
+                Email = enrollment.User.Email,
+            },
+            SchoolClass = new SchoolClassGetDto
+            {
+                Id = enrollment.SchoolClass.Id,
+                Name = enrollment.SchoolClass.Name,
+                Description = enrollment.SchoolClass.Description,
+            }
+        };
     }
 
-    public async Task<EnrollmentGetDto?> GetByIdAsync(int id)
+    public async Task<List<EnrollmentGetDetailDto>> GetAllAsync()
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
-        var entity = await _repository.GetByIdAsync(id);
-        return entity is null || entity.Deleted ? null : ToDto(entity);
-    }
-
-    public async Task<List<EnrollmentGetDto>> GetAllAsync()
-    {
-        var entities = await _repository.GetAllAsync();
-        return entities.Where(entity => !entity.Deleted).Select(ToDto).ToList();
+        var enrollments = await _enrollmentRepository.GetAllAsync();
+        var enrollmentsGetDetailsDto = new List<EnrollmentGetDetailDto>();
+        enrollmentsGetDetailsDto.AddRange(enrollments.Select(enrollment => new EnrollmentGetDetailDto
+        {
+            Id = enrollment.Id,
+            EnrollmentDate = enrollment.EnrollmentDate,
+            EnrollmentExpiration = enrollment.ExpirationDate,
+            IsActive = enrollment.IsActive,
+            User = new UserGetDto
+            {
+                Id = enrollment.UserId,
+                Name = enrollment.User.Name,
+                Email = enrollment.User.Email,
+            },
+            SchoolClass = new SchoolClassGetDto
+            {
+                Id = enrollment.SchoolClass.Id,
+                Name = enrollment.SchoolClass.Name,
+                Description = enrollment.SchoolClass.Description,
+            }
+        }));
+        return enrollmentsGetDetailsDto;
     }
 
     public async Task<EnrollmentGetDto> AddAsync(EnrollmentPostDto dto)
     {
-        ServiceValidation.Validate(dto);
-        await ValidateRelationsAsync(dto.UserId, dto.ClassId, dto.EnrollmentDate, dto.ExpirationDate);
-        var entity = new Enrollment();
-        entity.UserId = dto.UserId;
-        entity.ClassId = dto.ClassId;
-        entity.EnrollmentDate = dto.EnrollmentDate;
-        entity.ExpirationDate = dto.ExpirationDate;
-        entity.IsActive = dto.IsActive;
-        return ToDto(await _repository.AddAsync(entity));
+        var enrollment = new Enrollment
+        {
+            UserId = dto.UserId,
+            SchoolClassId = dto.SchoolClassId,
+            EnrollmentDate = DateTime.UtcNow,
+            ExpirationDate =  dto.ExpirationDate,
+            IsActive = true
+        };
+
+        var createdMatricula = await _enrollmentRepository.AddAsync(enrollment);
+        return new EnrollmentGetDto
+        {
+            Id = createdMatricula.Id,
+            UserId = createdMatricula.UserId,
+            SchoolClassId = createdMatricula.SchoolClassId,
+            EnrollmentDate = createdMatricula.EnrollmentDate,
+            ExpirationDate = createdMatricula.ExpirationDate,
+            IsActive = createdMatricula.IsActive
+        };
     }
 
     public async Task<EnrollmentGetDto?> UpdateAsync(EnrollmentPutDto dto)
     {
-        ServiceValidation.Validate(dto);
-        var entity = await _repository.GetByIdAsync(dto.Id);
-        if (entity is null || entity.Deleted) return null;
-        await ValidateRelationsAsync(dto.UserId, dto.ClassId, dto.EnrollmentDate, dto.ExpirationDate);
-        entity.UserId = dto.UserId;
-        entity.ClassId = dto.ClassId;
-        entity.EnrollmentDate = dto.EnrollmentDate;
-        entity.ExpirationDate = dto.ExpirationDate;
-        entity.IsActive = dto.IsActive;
-        return ToDto(await _repository.UpdateAsync(entity));
+        var enrollment = new Enrollment
+        {
+            Id = dto.Id,
+            SchoolClassId = dto.SchoolClassId,
+            ExpirationDate = dto.ExpirationDate,
+        };
+        var updatedEnrollment = await _enrollmentRepository.UpdateAsync(enrollment);
+        if (updatedEnrollment == null) return null;
+        return new EnrollmentGetDto
+        {
+            Id = updatedEnrollment.Id,
+            UserId = updatedEnrollment.UserId,
+            SchoolClassId = updatedEnrollment.SchoolClassId,
+            EnrollmentDate = updatedEnrollment.EnrollmentDate,
+            ExpirationDate = updatedEnrollment.ExpirationDate,
+            IsActive = updatedEnrollment.IsActive
+        };
     }
 
     public async Task<EnrollmentGetDto?> DeleteAsync(int id)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(id);
-        var entity = await _repository.GetByIdAsync(id);
-        if (entity is null || entity.Deleted) return null;
-        var deleted = await _repository.DeleteAsync(id);
-        return deleted is null ? null : ToDto(deleted);
-    }
+        var deletedEnrollment = await _enrollmentRepository.DeleteAsync(id);
+        if (deletedEnrollment == null)
+        {
+            return null;
+        }
 
-    private async Task ValidateRelationsAsync(int userId, int classId, DateTime enrollmentDate, DateTime expirationDate)
-    {
-        ServiceValidation.Require(enrollmentDate != default && expirationDate > enrollmentDate, "A expiração deve ser posterior à matrícula.");
-        ServiceValidation.Require(enrollmentDate.Kind == DateTimeKind.Utc && expirationDate.Kind == DateTimeKind.Utc, "Informe as datas em UTC.");
-        var user = await _userRepository.GetByIdAsync(userId);
-        var schoolClass = await _classRepository.GetByIdAsync(classId);
-        ServiceValidation.Require(user is not null && !user.Deleted, "Usuário inexistente ou excluído.");
-        ServiceValidation.Require(schoolClass is not null && !schoolClass.Deleted, "Turma inexistente ou excluída.");
+        return new EnrollmentGetDto
+        {
+            Id = deletedEnrollment.Id,
+            UserId = deletedEnrollment.UserId,
+            SchoolClassId = deletedEnrollment.SchoolClassId,
+            EnrollmentDate = deletedEnrollment.EnrollmentDate,
+            ExpirationDate = deletedEnrollment.ExpirationDate,
+            IsActive = deletedEnrollment.IsActive
+        };
     }
-
-    private static EnrollmentGetDto ToDto(Enrollment entity) => new()
-    {
-        Id = entity.Id,
-        UserId = entity.UserId,
-        ClassId = entity.ClassId,
-        EnrollmentDate = entity.EnrollmentDate,
-        ExpirationDate = entity.ExpirationDate,
-        IsActive = entity.IsActive
-    };
 }

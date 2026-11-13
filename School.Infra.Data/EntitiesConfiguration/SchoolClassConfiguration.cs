@@ -1,13 +1,14 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using School.Domain.Entities;
 
 namespace School.Infra.Data.EntitiesConfiguration;
 
-public class ClassConfiguration : IEntityTypeConfiguration<Class>
+public class SchoolClassConfiguration : IEntityTypeConfiguration<SchoolClass>
 {
-    public void Configure(EntityTypeBuilder<Class> builder)
+    public void Configure(EntityTypeBuilder<SchoolClass> builder)
     {
+        builder.ToTable("SchoolClass");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Name)
             .IsRequired()
@@ -18,7 +19,7 @@ public class ClassConfiguration : IEntityTypeConfiguration<Class>
         builder.Property(x => x.CourseId)
             .IsRequired();
         builder.HasOne(x => x.Course)
-            .WithMany(x => x.Classes)
+            .WithMany(x => x.SchoolClasses)
             .HasForeignKey(x => x.CourseId)
             .OnDelete(DeleteBehavior.NoAction);
     }

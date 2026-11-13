@@ -31,11 +31,16 @@ public class UserRepository : IUserRepository
         return user;
     }
 
-    public async Task<User> UpdateAsync(User user)
+    public async Task<User?> UpdateAsync(User user)
     {
-        _context.User.Update(user);
+        var existing = await _context.User.FindAsync(user.Id);
+        if (existing == null) return null;
+        existing.Name = user.Name;
+        existing.Email = user.Email;
+        existing.PasswordHash = user.PasswordHash;
+        existing.PasswordSalt = user.PasswordSalt;
         await _context.SaveChangesAsync();
-        return user;
+        return existing;
     }
 
     public async Task<User?> DeleteAsync(int id)

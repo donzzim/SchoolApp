@@ -22,37 +22,6 @@ namespace School.Infra.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("School.Domain.Entities.Class", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CourseId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("Deleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CourseId");
-
-                    b.ToTable("Classes");
-                });
-
             modelBuilder.Entity("School.Domain.Entities.Course", b =>
                 {
                     b.Property<int>("Id")
@@ -86,9 +55,6 @@ namespace School.Infra.Data.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("ClassId")
-                        .HasColumnType("integer");
-
                     b.Property<bool>("Deleted")
                         .HasColumnType("boolean");
 
@@ -101,12 +67,15 @@ namespace School.Infra.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
+                    b.Property<int>("SchoolClassId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ClassId");
+                    b.HasIndex("SchoolClassId");
 
                     b.HasIndex("UserId");
 
@@ -148,6 +117,37 @@ namespace School.Infra.Data.Migrations
                     b.ToTable("Grade");
                 });
 
+            modelBuilder.Entity("School.Domain.Entities.SchoolClass", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Deleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.ToTable("SchoolClass", (string)null);
+                });
+
             modelBuilder.Entity("School.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
@@ -187,22 +187,11 @@ namespace School.Infra.Data.Migrations
                     b.ToTable("User");
                 });
 
-            modelBuilder.Entity("School.Domain.Entities.Class", b =>
-                {
-                    b.HasOne("School.Domain.Entities.Course", "Course")
-                        .WithMany("Classes")
-                        .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.Navigation("Course");
-                });
-
             modelBuilder.Entity("School.Domain.Entities.Enrollment", b =>
                 {
-                    b.HasOne("School.Domain.Entities.Class", "Class")
+                    b.HasOne("School.Domain.Entities.SchoolClass", "SchoolClass")
                         .WithMany("Enrollments")
-                        .HasForeignKey("ClassId")
+                        .HasForeignKey("SchoolClassId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
@@ -212,7 +201,7 @@ namespace School.Infra.Data.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.Navigation("Class");
+                    b.Navigation("SchoolClass");
 
                     b.Navigation("User");
                 });
@@ -236,19 +225,30 @@ namespace School.Infra.Data.Migrations
                     b.Navigation("Enrollment");
                 });
 
-            modelBuilder.Entity("School.Domain.Entities.Class", b =>
+            modelBuilder.Entity("School.Domain.Entities.SchoolClass", b =>
                 {
-                    b.Navigation("Enrollments");
+                    b.HasOne("School.Domain.Entities.Course", "Course")
+                        .WithMany("SchoolClasses")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.Navigation("Course");
                 });
 
             modelBuilder.Entity("School.Domain.Entities.Course", b =>
                 {
-                    b.Navigation("Classes");
+                    b.Navigation("SchoolClasses");
                 });
 
             modelBuilder.Entity("School.Domain.Entities.Enrollment", b =>
                 {
                     b.Navigation("Grades");
+                });
+
+            modelBuilder.Entity("School.Domain.Entities.SchoolClass", b =>
+                {
+                    b.Navigation("Enrollments");
                 });
 
             modelBuilder.Entity("School.Domain.Entities.User", b =>

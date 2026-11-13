@@ -1,6 +1,6 @@
 namespace School.Domain.Entities;
 
-public class Class
+public class SchoolClass
 {
     public int Id { get; set; }
     public bool Deleted { get; set; }

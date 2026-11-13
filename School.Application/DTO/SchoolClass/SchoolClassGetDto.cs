@@ -1,8 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace School.Application.DTO.Class;
+namespace School.Application.DTO.SchoolClass;
 
-public class ClassGetDto
+public class SchoolClassGetDto
 {
     public int Id { get; set; }
     public string? Name { get; set; }

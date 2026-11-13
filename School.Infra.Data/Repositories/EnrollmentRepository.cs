@@ -16,12 +16,13 @@ public class EnrollmentRepository : IEnrollmentRepository
 
     public async Task<Enrollment?> GetByIdAsync(int id)
     {
-        return await _context.Enrollment.FindAsync(id);
+        return await _context.Enrollment.Include(e => e.User).Include(e => e.SchoolClass)
+            .FirstOrDefaultAsync(e => e.Id == id);
     }
 
     public async Task<List<Enrollment>> GetAllAsync()
     {
-        return await _context.Enrollment.ToListAsync();
+        return await _context.Enrollment.Include(e => e.User).Include(e => e.SchoolClass).ToListAsync();
     }
 
     public async Task<Enrollment> AddAsync(Enrollment enrollment)
