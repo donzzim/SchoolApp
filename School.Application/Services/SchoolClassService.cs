@@ -1,5 +1,6 @@
 using School.Application.DTO.SchoolClass;
 using School.Application.DTO.Course;
+using School.Application.Exceptions;
 using School.Application.Interfaces;
 using School.Domain.Entities;
 using School.Domain.Interfaces;
@@ -9,17 +10,18 @@ namespace School.Application.Services;
 public class SchoolClassService : ISchoolClassService
 {
     private readonly ISchoolClassRepository _schoolClassRepository;
+    private readonly ICourseRepository _courseRepository;
 
-    public SchoolClassService(ISchoolClassRepository schoolClassRepository)
+    public SchoolClassService(ISchoolClassRepository schoolClassRepository,  ICourseRepository courseRepository)
     {
         _schoolClassRepository = schoolClassRepository;
-
+        _courseRepository = courseRepository;
     }
 
     public async Task<SchoolClassGetDetailDto?> GetByIdAsync(int id)
     {
         var schoolClass = await _schoolClassRepository.GetByIdAsync(id);
-        if (schoolClass == null) return null;
+        if (schoolClass == null) throw new NotFoundException("School Class not found");
         return new SchoolClassGetDetailDto
         {
             Id = schoolClass.Id,
@@ -50,6 +52,8 @@ public class SchoolClassService : ISchoolClassService
 
     public async Task<SchoolClassGetDto> AddAsync(SchoolClassPostDto dto)
     {
+        var course = await _courseRepository.GetByIdAsync(dto.CourseId);
+        if (course == null) throw new NotFoundException("School Class not found");
 
         var schoolClass = new SchoolClass
         {
@@ -69,11 +73,16 @@ public class SchoolClassService : ISchoolClassService
 
     public async Task<SchoolClassGetDto?> UpdateAsync(SchoolClassPutDto dto)
     {
+        var schoolClass = await _schoolClassRepository.GetByIdAsync(dto.Id);
+        if (schoolClass == null) throw new NotFoundException("School Class not found");
 
-        var schoolClass = new SchoolClass
-        {
-            Id = dto.Id, Name = dto.Name, Description = dto.Description, CourseId = dto.CourseId
-        };
+        var course = await _courseRepository.GetByIdAsync(dto.CourseId);
+        if (course == null) throw new NotFoundException("Course not found");
+
+        schoolClass.Id = dto.Id;
+        schoolClass.Name = dto.Name;
+        schoolClass.Description = dto.Description;
+        schoolClass.CourseId = dto.CourseId;
 
         var saved = await _schoolClassRepository.UpdateAsync(schoolClass);
         if (saved == null) return null;
@@ -89,7 +98,7 @@ public class SchoolClassService : ISchoolClassService
     public async Task<SchoolClassGetDto?> DeleteAsync(int id)
     {
         var deleted = await _schoolClassRepository.DeleteAsync(id);
-        if (deleted == null) return null;
+        if (deleted == null) throw new NotFoundException("School Class not found");
         return new SchoolClassGetDto
         {
             Id = deleted.Id,

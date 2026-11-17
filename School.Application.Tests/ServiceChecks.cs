@@ -11,7 +11,7 @@ var courseService = new CourseService(courses);
 var course = await courseService.AddAsync(new CoursePostDto { Name = " Curso ", Description = "Descrição" });
 Check(course.Name == " Curso ", "Mapeamento direto sem normalização");
 var schoolClasses = new FakeSchoolClassRepository();
-var schoolClassService = new SchoolClassService(schoolClasses);
+var schoolClassService = new SchoolClassService(schoolClasses, courses);
 var schoolClass = await schoolClassService.AddAsync(new SchoolClassPostDto { Name = "Turma", Description = "Descrição", CourseId = course.Id });
 schoolClasses.Items.Single().Course = courses.Items.Single();
 Check((await schoolClassService.GetByIdAsync(schoolClass.Id))!.Course!.Id == course.Id, "Consulta detalhada de turma");

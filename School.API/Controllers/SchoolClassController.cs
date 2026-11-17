@@ -19,7 +19,6 @@ public class SchoolClassController : Controller
     public async Task<ActionResult> CreateSchoolClass(SchoolClassPostDto schoolClassPostDto)
     {
         var createdSchoolClass = await _schoolClassService.AddAsync(schoolClassPostDto);
-        if (createdSchoolClass == null) return BadRequest("Something went wrong on creating School Class");
         return Ok(createdSchoolClass);
     }
 
@@ -27,7 +26,6 @@ public class SchoolClassController : Controller
     public async Task<ActionResult> UpdateSchoolClass(SchoolClassPutDto schoolClassPutDto)
     {
         var updatedSchoolClass = await _schoolClassService.UpdateAsync(schoolClassPutDto);
-        if(updatedSchoolClass == null) return BadRequest("Something went wrong on updating School Class");
         return Ok(updatedSchoolClass);
     }
 
@@ -35,7 +33,6 @@ public class SchoolClassController : Controller
     public async Task<ActionResult> DeleteSchoolClass(int id)
     {
         var deletedSchoolClass = await _schoolClassService.DeleteAsync(id);
-        if(deletedSchoolClass == null) return BadRequest("Something went wrong on deleting School Class");
         return Ok(deletedSchoolClass);
     }
 
@@ -43,7 +40,6 @@ public class SchoolClassController : Controller
     public async Task<ActionResult> GetSchoolClassById(int id)
     {
         var schoolClass = await _schoolClassService.GetByIdAsync(id);
-        if (schoolClass == null) return NotFound("Something went wrong on find the School Class");
         return Ok(schoolClass);
     }
 
