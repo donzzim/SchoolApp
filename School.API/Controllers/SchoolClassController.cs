@@ -43,12 +43,12 @@ public class SchoolClassController : Controller
     public async Task<ActionResult> GetSchoolClassById(int id)
     {
         var schoolClass = await _schoolClassService.GetByIdAsync(id);
-        if (schoolClass == null) return BadRequest("Something went wrong on find the School Class");
+        if (schoolClass == null) return NotFound("Something went wrong on find the School Class");
         return Ok(schoolClass);
     }
 
     [HttpGet]
-    public async Task<ActionResult> GetAllSchoolClasses(int id)
+    public async Task<ActionResult> GetAllSchoolClasses()
     {
         var schoolClasses = await _schoolClassService.GetAllAsync();
         return Ok(schoolClasses);

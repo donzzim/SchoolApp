@@ -4,7 +4,7 @@ Projeto de estudo de uma API escolar em **ASP.NET Core / .NET 10**, com Entity F
 
 ## Estado atual
 
-As cinco entidades possuem repositórios, DTOs, interfaces de serviço e serviços CRUD registrados na injeção de dependência. A camada HTTP ainda contém apenas o exemplo `WeatherForecastController`: **os serviços escolares ainda não possuem endpoints**. Também não há autenticação, autorização por perfil, paginação ou tratamento global das exceções de negócio.
+As cinco entidades possuem repositórios, DTOs, interfaces de serviço e serviços CRUD registrados na injeção de dependência. A camada HTTP expõe cursos, turmas, usuários, matrículas e notas, além do exemplo `WeatherForecastController`. Ainda não há autenticação, autorização por perfil, paginação ou tratamento global das exceções de negócio.
 
 ## Como as camadas se relacionam
 
@@ -18,14 +18,14 @@ flowchart LR
     IOC[School.Infra.Ioc] -. registra implementações .-> API
 ```
 
-O fluxo HTTP acima representa a organização a seguir ao criar os controllers escolares. Hoje os serviços já podem ser chamados diretamente pelo código, mas só o exemplo de previsão do tempo está publicado via HTTP.
+O fluxo HTTP acima é implementado pelos controllers escolares, que recebem DTOs e chamam os serviços por suas interfaces, sem acessar diretamente a persistência.
 
 A separação é uma arquitetura em camadas com inversão de dependência: a aplicação conhece contratos de persistência, sem depender do EF Core. Isso facilita testar regras sem banco e trocar a implementação de armazenamento. As entidades atuais são classes de dados; as regras implementadas ficam nos serviços.
 
 | Projeto/pasta | Responsabilidade e exemplos |
 | --- | --- |
 | `School.API` | Entrada HTTP e inicialização da aplicação. |
-| `School.API/Controllers` | Receber requisições, chamar serviços e definir respostas HTTP. Atualmente contém apenas WeatherForecast. |
+| `School.API/Controllers` | Receber requisições, chamar serviços e definir respostas HTTP. Contém Course, SchoolClass, User, Enrollment, Grade e WeatherForecast. |
 | `School.API/Program.cs` | Montar o container de dependências e o pipeline de middleware; registrar controllers, infraestrutura e OpenAPI. |
 | `School.API/Properties` | Perfis locais de execução, quando presentes. |
 | `School.API/appsettings*.json` | Configurações por ambiente. Credenciais reais devem ficar fora do Git. |
@@ -59,7 +59,7 @@ Referências de projeto: `Application → Domain`; `Infra.Data → Domain`; `Inf
 
 Uma **entidade** representa o modelo persistido. Um **DTO** representa os dados aceitos ou devolvidos por uma operação. Por exemplo, `CoursePostDto` recebe nome e descrição; `CoursePutDto` também exige ID; `CourseGetDto` devolve a identificação gerada. Os DTOs não expõem `Deleted` nem as coleções de navegação.
 
-Uma **interface** define um contrato. `ICourseService` descreve os casos de uso; `ICourseRepository` descreve o acesso aos dados. O **serviço** decide se a operação é válida e converte os dados. O **repositório** usa o contexto para persistir. Um controller futuro deve depender de `ICourseService`, sem instanciar repositórios ou contextos manualmente.
+Uma **interface** define um contrato. `ICourseService` descreve os casos de uso; `ICourseRepository` descreve o acesso aos dados. O **serviço** decide se a operação é válida e converte os dados. O **repositório** usa o contexto para persistir. O controller de cursos depende de `ICourseService`, sem instanciar repositórios ou contextos manualmente.
 
 ### Métodos dos serviços
 
@@ -77,38 +77,48 @@ Task e await representam operações assíncronas de acesso à persistência. As
 
 ### Mapeamento e regras atuais
 
-- Os serviços não executam Data Annotations, normalização com Trim ou validação geral de IDs e vínculos. As anotações continuam nos DTOs para validação na futura camada HTTP; chamadas diretas não as executam automaticamente.
+- Os serviços não executam Data Annotations, normalização com Trim ou validação geral de IDs e vínculos. Na camada HTTP, [ApiController] executa a validação das anotações dos DTOs e retorna 400 quando inválidos; chamadas diretas aos serviços não as executam automaticamente.
 - Turmas associam CourseId; a consulta individual retorna SchoolClassGetDetailDto com o curso. O repositório carrega essa navegação com Include.
 - Matrículas geram EnrollmentDate em UTC e começam com IsActive igual a true. O serviço de referência recebe apenas o repositório de matrículas e retorna usuário e turma nas consultas detalhadas. O repositório carrega essas navegações.
 - Na atualização, notas derivam CourseId pela matrícula e sua turma (SchoolClassId). A ausência desses vínculos gera InvalidOperationException. A criação atual gera DateGrade com DateTime.Now e define IsApproved quando GradeValue é maior ou igual a 60.
-- Usuários recebem perfil Student na criação. UpdateAsync recebe userId separado do DTO. Criação e atualização geram hash PBKDF2-SHA256 com 600.000 iterações, salt aleatório de 16 bytes e hash de 32 bytes. As leituras não retornam credenciais.
+- Usuários recebem perfil Student na criação. UpdateAsync recebe userId separado do DTO. A criação gera hash HMACSHA512 com 64 bytes e armazena a chave como salt. A atualização atual altera nome e e-mail, mas não aplica a senha recebida no DTO. As leituras não retornam credenciais.
 - Os repositórios de curso, turma, usuário e nota buscam a entidade existente durante a atualização e alteram somente os campos permitidos; retornam null quando ausente. Isso preserva Deleted, perfil do usuário, data e aprovação da nota. O EnrollmentService e sua atualização de referência foram preservados; seu repositório ainda usa Update da entidade recebida, que grava também os valores padrão dos campos omitidos.
 
 ### Exclusão lógica e limitações
 
 Os repositórios marcam Deleted como true. Seguindo o serviço de referência, os serviços retornam os registros fornecidos pelo repositório, sem ocultar excluídos nem bloquear sua atualização. Uma política uniforme de filtragem e validação permanece como evolução futura.
 
-As exceções ainda não são convertidas globalmente em respostas HTTP. Não há controllers escolares, autenticação, autorização nem política completa de exclusão de relacionamentos.
+As exceções ainda não são convertidas globalmente em respostas HTTP. Não há autenticação, autorização nem política completa de exclusão de relacionamentos.
 
 ## Injeção de dependência e pipeline
 
 `AddScoped<ICourseService, CourseService>()` informa ao ASP.NET Core qual implementação criar quando alguém solicitar a interface. O tempo de vida scoped compartilha a instância dentro de um escopo, normalmente uma requisição HTTP. Os repositórios e o `DbContext` seguem esse tempo de vida.
 
-Em `Program.cs`, `AddControllers` registra a infraestrutura dos controllers, `AddInfrastructure` registra serviços/repositórios/banco e `AddOpenApi` registra a geração do contrato HTTP. Depois de `Build`, `MapOpenApi` publica o documento em desenvolvimento, `UseHttpsRedirection` redireciona para HTTPS, `UseAuthorization` participa do pipeline de autorização e `MapControllers` mapeia as rotas. A presença de `UseAuthorization` sozinha não configura login ou proteção dos endpoints.
+Em `Program.cs`, `AddControllers` registra os controllers, `AddInfrastructure` registra serviços/repositórios/banco e `AddSwaggerGen` gera o contrato OpenAPI. Em desenvolvimento, `UseSwagger` publica `/swagger/v1/swagger.json` e `UseSwaggerUI` disponibiliza `/swagger`. `UseHttpsRedirection` redireciona para HTTPS e `MapControllers` mapeia as rotas. `UseAuthorization` e a definição Bearer do Swagger não implementam login nem protegem os endpoints.
 
-## Como implementar um endpoint ASP.NET Core
+## Endpoints implementados
 
-Para expor cursos, crie um `CoursesController` com `[ApiController]`, `[Route("api/courses")]` e uma dependência de `ICourseService` recebida no construtor. `[ApiController]` faz a validação automática do modelo de entrada; as regras que dependem de outros registros continuam no serviço.
+Os controllers usam `[ApiController]`, `[Route("api/[controller]")]` e injeção da interface de serviço no construtor. O token `[controller]` é substituído pelo nome da classe sem o sufixo Controller.
 
-| Operação sugerida | Método HTTP | Resposta esperada |
+| Recurso | Rota base | DTO de criação | DTO de atualização |
+| --- | --- | --- | --- |
+| Cursos | `/api/Course` | `CoursePostDto` | `CoursePutDto` |
+| Turmas | `/api/SchoolClass` | `SchoolClassPostDto` | `SchoolClassPutDto` |
+| Usuários | `/api/User` | `UserPostDto` | `UserPutDto` |
+| Matrículas | `/api/Enrollment` | `EnrollmentPostDto` | `EnrollmentPutDto` |
+| Notas | `/api/Grade` | `GradePostDto` | `GradePutDto` |
+
+| Operação | Método e caminho relativo | Comportamento |
 | --- | --- | --- |
-| Listar | `GET /api/courses` | `200 OK` com lista |
-| Consultar | `GET /api/courses/{id}` | `200 OK` ou `404 Not Found` |
-| Criar | `POST /api/courses` | `201 Created`, preferencialmente com `CreatedAtAction` |
-| Atualizar | `PUT /api/courses/{id}` | `200 OK` ou `204 No Content`; `404` quando ausente |
-| Excluir | `DELETE /api/courses/{id}` | `204 No Content`; `404` quando ausente |
+| Listar | `GET` na rota base | `200 OK` com lista, inclusive vazia. |
+| Consultar | `GET /{id}` | `200 OK` com DTO ou `404 Not Found` quando ausente. |
+| Criar | `POST` na rota base | DTO no corpo; `200 OK` com o resultado ou `400 Bad Request` se o serviço retornar null. |
+| Atualizar | `PUT` na rota base; usuários usam `PUT /api/User/{id}` | DTO no corpo; `200 OK` com o resultado ou `400 Bad Request` quando ausente. |
+| Excluir | `DELETE /{id}` | `200 OK` com o DTO da exclusão lógica; ausência retorna `404`, exceto SchoolClass, que mantém `400`. |
 
-Essas rotas são uma orientação de implementação, não endpoints já disponíveis. Ao implementar PUT, confira se o ID da rota coincide com o DTO. Converta erros de validação em `400 Bad Request`, use `ProblemDetails` para respostas consistentes e preserve detalhes técnicos nos logs. Autenticação e autorização devem ser definidas antes de publicar operações de usuários e perfis.
+Nas atualizações de cursos, turmas, matrículas e notas, o ID vem do DTO. Em usuários, o ID vem da rota e é passado separadamente ao serviço. Consultas de matrículas e a consulta individual de turma retornam DTOs detalhados. Os DTOs de usuário não expõem senha, salt ou hash.
+
+`[ApiController]` retorna `400 Bad Request` automaticamente quando o corpo viola as anotações dos DTOs. Exceções de serviço e persistência ainda não têm conversão global em respostas de negócio. A padronização das respostas de ausência, o uso de `201 Created` com `CreatedAtAction`, o tratamento global com `ProblemDetails` e a autenticação/autorização permanecem como melhorias futuras.
 
 Para adicionar uma funcionalidade: modele a entidade e seus relacionamentos; crie/ajuste a configuração EF; gere uma migration se o esquema mudar; defina DTOs e contrato do serviço; implemente regras e persistência; registre as dependências; exponha o controller; teste regras e respostas; atualize este README no mesmo commit.
 
@@ -125,7 +135,7 @@ dotnet ef database update --project School.Infra.Data --startup-project School.A
 dotnet run --project School.API
 ```
 
-O ASP.NET Core combina configurações de `appsettings.json`, ambiente e outras fontes. Também é possível usar User Secrets no projeto API. Não versione senhas reais. Consulte a URL exibida no terminal; em desenvolvimento o documento OpenAPI fica em `/openapi/v1.json`.
+O ASP.NET Core combina configurações de `appsettings.json`, ambiente e outras fontes. Também é possível usar User Secrets no projeto API. Não versione senhas reais. Consulte a URL exibida no terminal; em desenvolvimento o documento OpenAPI fica em `/swagger/v1/swagger.json`.
 
 Migrations são alterações versionadas do esquema, não alterações automáticas causadas por editar uma entidade:
 
@@ -152,3 +162,5 @@ Na validação desta implementação, a compilação apontou avisos já presente
 A migration RenameClassToSchoolClass renomeia a tabela Classes para SchoolClasses e a coluna ClassId para SchoolClassId, com seus índices e restrições, preservando os registros. As migrations anteriores mantêm os nomes históricos. Para atualizar um banco existente, execute dotnet ef database update --project School.Infra.Data --startup-project School.API; as migrations de renomeação foram aplicadas com sucesso ao banco configurado nesta execução.
 
 O nome final da tabela é SchoolClass (singular), definido explicitamente por ToTable em SchoolClassConfiguration. A migration UseSchoolClassTableName renomeia SchoolClasses para SchoolClass e ajusta as restrições e o índice; o DbSet e as coleções em C# permanecem SchoolClasses. As duas migrations de renomeação foram aplicadas com dotnet ef database update --project School.Infra.Data --startup-project School.API, preservando os registros existentes.
+
+Na validação dos controllers, dotnet build SchoolApp.sln concluiu sem erros, com avisos de nulabilidade e conflito de versões do EF Core. O comando dotnet run --project School.Application.Tests falhou na verificação 'Hash gerado': o teste espera 32 bytes, enquanto o UserService existente gera 64 bytes com HMACSHA512. Essa divergência preexistente entre serviço e testes permanece pendente; não foram executados testes HTTP com PostgreSQL.
