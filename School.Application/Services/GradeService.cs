@@ -1,3 +1,4 @@
+using School.Application.Exceptions;
 using School.Application.DTO.Grade;
 
 using School.Application.Interfaces;
@@ -21,7 +22,7 @@ public class GradeService : IGradeService
     public async Task<GradeGetDto?> GetByIdAsync(int id)
     {
         var grade = await _gradeRepository.GetByIdAsync(id);
-        if (grade == null) return null;
+        if (grade == null) throw new NotFoundException("Grade not found");
         return new GradeGetDto
         {
             Id = grade.Id,
@@ -78,7 +79,7 @@ public class GradeService : IGradeService
         };
 
         var saved = await _gradeRepository.UpdateAsync(grade);
-        if (saved == null) return null;
+        if (saved == null) throw new NotFoundException("Grade not found");
         return new GradeGetDto
         {
             Id = saved.Id,
@@ -92,7 +93,7 @@ public class GradeService : IGradeService
     public async Task<GradeGetDto?> DeleteAsync(int id)
     {
         var deleted = await _gradeRepository.DeleteAsync(id);
-        if (deleted == null) return null;
+        if (deleted == null) throw new NotFoundException("Grade not found");
         return new GradeGetDto
         {
             Id = deleted.Id,
@@ -105,9 +106,9 @@ public class GradeService : IGradeService
     private async Task<int> GetCourseIdAsync(int enrollmentId)
     {
         var enrollment = await _enrollmentRepository.GetByIdAsync(enrollmentId)
-            ?? throw new InvalidOperationException("Matrícula inexistente.");
+            ?? throw new NotFoundException("Enrollment not found");
         var schoolClass = await _schoolClassRepository.GetByIdAsync(enrollment.SchoolClassId)
-            ?? throw new InvalidOperationException("Turma inexistente.");
+            ?? throw new NotFoundException("School Class not found");
         return schoolClass.CourseId;
     }
 

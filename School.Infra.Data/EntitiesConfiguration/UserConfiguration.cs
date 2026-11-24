@@ -19,7 +19,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired();
         builder.Property(x => x.PasswordSalt)
             .IsRequired();
-        builder.Property(x => x.Profile)
+        builder.Property(x => x.Role)
             .IsRequired()
             .HasMaxLength(50);
     }

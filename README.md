@@ -4,7 +4,7 @@ Projeto de estudo de uma API escolar em **ASP.NET Core / .NET 10**, com Entity F
 
 ## Estado atual
 
-As cinco entidades possuem repositórios, DTOs, interfaces de serviço e serviços CRUD registrados na injeção de dependência. A camada HTTP expõe cursos, turmas, usuários, matrículas e notas, além do exemplo `WeatherForecastController`. Ainda não há autenticação, autorização por perfil, paginação ou tratamento global das exceções de negócio.
+As cinco entidades possuem repositórios, DTOs, interfaces de serviço e serviços CRUD registrados na injeção de dependência. A camada HTTP expõe cursos, turmas, usuários, matrículas e notas, além do exemplo `WeatherForecastController`. Ainda não há autenticação, autorização por perfil ou paginação. Há middleware global de exceções, com a limitação de status HTTP descrita adiante.
 
 ## Como as camadas se relacionam
 
@@ -67,11 +67,11 @@ Os serviços seguem o padrão de EnrollmentService: recebem os DTOs, criam entid
 
 | Método | Comportamento |
 | --- | --- |
-| GetByIdAsync(id) | Consulta o repositório e retorna DTO ou null quando ausente. Turmas e matrículas retornam DTOs detalhados com relacionamentos. |
+| GetByIdAsync(id) | Consulta o repositório e retorna DTO; lança NotFoundException quando ausente. Turmas e matrículas retornam DTOs detalhados com relacionamentos. |
 | GetAllAsync() | Mapeia os registros devolvidos pelo repositório para uma lista de DTOs, sem filtro adicional no serviço. Matrículas usam EnrollmentGetDetailDto. |
 | AddAsync(dto) | Cria a entidade a partir do DTO e retorna os valores persistidos. |
 | UpdateAsync(dto) | Cria uma entidade com os campos de entrada e delega a atualização ao repositório. Usuários recebem o ID separadamente: UpdateAsync(userId, dto). |
-| DeleteAsync(id) | Delega a exclusão ao repositório e retorna DTO ou null. |
+| DeleteAsync(id) | Delega a exclusão ao repositório e retorna DTO; lança NotFoundException quando ausente. |
 
 Task e await representam operações assíncronas de acesso à persistência. As respostas são construídas com os dados devolvidos pelo repositório, inclusive IDs gerados.
 
@@ -80,7 +80,7 @@ Task e await representam operações assíncronas de acesso à persistência. As
 - Os serviços não executam Data Annotations, normalização com Trim ou validação geral de IDs e vínculos. Na camada HTTP, [ApiController] executa a validação das anotações dos DTOs e retorna 400 quando inválidos; chamadas diretas aos serviços não as executam automaticamente.
 - Turmas associam CourseId; a consulta individual retorna SchoolClassGetDetailDto com o curso. O repositório carrega essa navegação com Include.
 - Matrículas geram EnrollmentDate em UTC e começam com IsActive igual a true. O serviço de referência recebe apenas o repositório de matrículas e retorna usuário e turma nas consultas detalhadas. O repositório carrega essas navegações.
-- Na atualização, notas derivam CourseId pela matrícula e sua turma (SchoolClassId). A ausência desses vínculos gera InvalidOperationException. A criação atual gera DateGrade com DateTime.Now e define IsApproved quando GradeValue é maior ou igual a 60.
+- Na atualização, notas derivam CourseId pela matrícula e sua turma (SchoolClassId). A ausência desses vínculos gera NotFoundException. A criação atual gera DateGrade com DateTime.Now e define IsApproved quando GradeValue é maior ou igual a 60.
 - Usuários recebem perfil Student na criação. UpdateAsync recebe userId separado do DTO. A criação gera hash HMACSHA512 com 64 bytes e armazena a chave como salt. A atualização atual altera nome e e-mail, mas não aplica a senha recebida no DTO. As leituras não retornam credenciais.
 - Os repositórios de curso, turma, usuário e nota buscam a entidade existente durante a atualização e alteram somente os campos permitidos; retornam null quando ausente. Isso preserva Deleted, perfil do usuário, data e aprovação da nota. O EnrollmentService e sua atualização de referência foram preservados; seu repositório ainda usa Update da entidade recebida, que grava também os valores padrão dos campos omitidos.
 
@@ -88,7 +88,7 @@ Task e await representam operações assíncronas de acesso à persistência. As
 
 Os repositórios marcam Deleted como true. Seguindo o serviço de referência, os serviços retornam os registros fornecidos pelo repositório, sem ocultar excluídos nem bloquear sua atualização. Uma política uniforme de filtragem e validação permanece como evolução futura.
 
-As exceções ainda não são convertidas globalmente em respostas HTTP. Não há autenticação, autorização nem política completa de exclusão de relacionamentos.
+ExceptionMiddleware serializa globalmente as exceções; ainda fixa o status HTTP em 500, mesmo quando identifica uma exceção de negócio como 404 ou 400. Não há autenticação, autorização nem política completa de exclusão de relacionamentos.
 
 ## Injeção de dependência e pipeline
 
@@ -111,14 +111,14 @@ Os controllers usam `[ApiController]`, `[Route("api/[controller]")]` e injeção
 | Operação | Método e caminho relativo | Comportamento |
 | --- | --- | --- |
 | Listar | `GET` na rota base | `200 OK` com lista, inclusive vazia. |
-| Consultar | `GET /{id}` | `200 OK` com DTO ou `404 Not Found` quando ausente. |
+| Consultar | `GET /{id}` | `200 OK` com DTO; ausência lança NotFoundException (ver limitação do middleware). |
 | Criar | `POST` na rota base | DTO no corpo; `200 OK` com o resultado ou `400 Bad Request` se o serviço retornar null. |
-| Atualizar | `PUT` na rota base; usuários usam `PUT /api/User/{id}` | DTO no corpo; `200 OK` com o resultado ou `400 Bad Request` quando ausente. |
-| Excluir | `DELETE /{id}` | `200 OK` com o DTO da exclusão lógica; ausência retorna `404`, exceto SchoolClass, que mantém `400`. |
+| Atualizar | `PUT` na rota base; usuários usam `PUT /api/User/{id}` | DTO no corpo; `200 OK` com o resultado; ausência lança NotFoundException (ver limitação do middleware). |
+| Excluir | `DELETE /{id}` | `200 OK` com o DTO da exclusão lógica; ausência lança NotFoundException (ver limitação do middleware). |
 
 Nas atualizações de cursos, turmas, matrículas e notas, o ID vem do DTO. Em usuários, o ID vem da rota e é passado separadamente ao serviço. Consultas de matrículas e a consulta individual de turma retornam DTOs detalhados. Os DTOs de usuário não expõem senha, salt ou hash.
 
-`[ApiController]` retorna `400 Bad Request` automaticamente quando o corpo viola as anotações dos DTOs. Exceções de serviço e persistência ainda não têm conversão global em respostas de negócio. A padronização das respostas de ausência, o uso de `201 Created` com `CreatedAtAction`, o tratamento global com `ProblemDetails` e a autenticação/autorização permanecem como melhorias futuras.
+`[ApiController]` retorna `400 Bad Request` automaticamente quando o corpo viola as anotações dos DTOs. Exceções de serviço e persistência passam pelo middleware global, com a limitação de status HTTP descrita na seção de exceções. A padronização das respostas de ausência, o uso de `201 Created` com `CreatedAtAction`, o tratamento global com `ProblemDetails` e a autenticação/autorização permanecem como melhorias futuras.
 
 Para adicionar uma funcionalidade: modele a entidade e seus relacionamentos; crie/ajuste a configuração EF; gere uma migration se o esquema mudar; defina DTOs e contrato do serviço; implemente regras e persistência; registre as dependências; exponha o controller; teste regras e respostas; atualize este README no mesmo commit.
 
@@ -151,7 +151,7 @@ dotnet ef database update --project School.Infra.Data --startup-project School.A
 dotnet run --project School.Application.Tests
 ```
 
-O executável retorna erro se uma verificação falhar. ServiceChecks.cs verifica mapeamentos, consultas detalhadas, retornos ausentes, delegação ao repositório e geração de hash com repositórios em memória. Não acessa PostgreSQL e não substitui testes de integração ou HTTP.
+O executável retorna erro se uma verificação falhar. ServiceChecks.cs verifica mapeamentos, consultas detalhadas, exceções para registros ausentes, delegação ao repositório e geração de hash com repositórios em memória. Não acessa PostgreSQL e não substitui testes de integração ou HTTP.
 
 ## Manutenção deste guia
 
@@ -163,4 +163,14 @@ A migration RenameClassToSchoolClass renomeia a tabela Classes para SchoolClasse
 
 O nome final da tabela é SchoolClass (singular), definido explicitamente por ToTable em SchoolClassConfiguration. A migration UseSchoolClassTableName renomeia SchoolClasses para SchoolClass e ajusta as restrições e o índice; o DbSet e as coleções em C# permanecem SchoolClasses. As duas migrations de renomeação foram aplicadas com dotnet ef database update --project School.Infra.Data --startup-project School.API, preservando os registros existentes.
 
-Na validação dos controllers, dotnet build SchoolApp.sln concluiu sem erros, com avisos de nulabilidade e conflito de versões do EF Core. O comando dotnet run --project School.Application.Tests falhou na verificação 'Hash gerado': o teste espera 32 bytes, enquanto o UserService existente gera 64 bytes com HMACSHA512. Essa divergência preexistente entre serviço e testes permanece pendente; não foram executados testes HTTP com PostgreSQL.
+Na validação atual, dotnet run --project School.Application.Tests passou. Não foram executados testes HTTP com PostgreSQL.
+
+### Exceções dos serviços
+
+Os cinco serviços usam `School.Application.Exceptions.NotFoundException` nas consultas individuais, atualizações e exclusões de registros ausentes. As interfaces em `School.Application/Interfaces` documentam essa condição com comentários XML; as classes de exceção permanecem na pasta `Exceptions`. As assinaturas anuláveis foram preservadas por compatibilidade, embora esses casos agora lancem exceção em vez de retornar null. Listagens vazias continuam válidas.
+
+SchoolClassService também verifica o curso na criação e atualização; GradeService usa a mesma exceção quando não encontra matrícula ou turma ao resolver o curso na atualização. EnrollmentService verifica a existência da matrícula antes de atualizar. BadRequestException permanece disponível para regras de entrada inválida, sem introdução de novas regras nesta alteração.
+
+O pipeline atual já registra ExceptionMiddleware, que identifica NotFoundException como 404 e BadRequestException como 400 no corpo. Há uma limitação na implementação HTTP: o middleware ainda fixa o status da resposta em 500. Os caminhos de ausência agora lançam exceção antes dos testes de null nos controllers; o status HTTP efetivo depende da correção desse middleware.
+
+As verificações de serviços foram ajustadas ao comportamento existente de senha (hash HMACSHA512 de 64 bytes e preservação do salt na atualização de nome/e-mail) e ao contrato de exceções para recursos ausentes. Isso substitui a divergência de testes de senha relatada anteriormente.

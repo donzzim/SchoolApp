@@ -53,7 +53,7 @@ public class SchoolClassService : ISchoolClassService
     public async Task<SchoolClassGetDto> AddAsync(SchoolClassPostDto dto)
     {
         var course = await _courseRepository.GetByIdAsync(dto.CourseId);
-        if (course == null) throw new NotFoundException("School Class not found");
+        if (course == null) throw new NotFoundException("Course not found");
 
         var schoolClass = new SchoolClass
         {
@@ -85,7 +85,7 @@ public class SchoolClassService : ISchoolClassService
         schoolClass.CourseId = dto.CourseId;
 
         var saved = await _schoolClassRepository.UpdateAsync(schoolClass);
-        if (saved == null) return null;
+        if (saved == null) throw new NotFoundException("School Class not found");
         return new SchoolClassGetDto
         {
             Id = saved.Id,

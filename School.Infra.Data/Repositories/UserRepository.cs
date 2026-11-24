@@ -9,6 +9,11 @@ public class UserRepository : IUserRepository
 {
     private readonly ApplicationDbContext _context;
 
+    public async Task<bool> UserExistsAsync()
+    {
+        return await _context.User.AnyAsync(x => x.Deleted == false);
+    }
+
     public UserRepository(ApplicationDbContext context)
     {
         _context = context;

@@ -1,3 +1,4 @@
+using School.Application.Exceptions;
 using School.Application.DTO.Course;
 
 using School.Application.Interfaces;
@@ -19,7 +20,7 @@ public class CourseService : ICourseService
     public async Task<CourseGetDto?> GetByIdAsync(int id)
     {
         var course = await _courseRepository.GetByIdAsync(id);
-        if (course == null) return null;
+        if (course == null) throw new NotFoundException("Course not found");
         return new CourseGetDto
         {
             Id = course.Id,
@@ -68,7 +69,7 @@ public class CourseService : ICourseService
         };
 
         var saved = await _courseRepository.UpdateAsync(course);
-        if (saved == null) return null;
+        if (saved == null) throw new NotFoundException("Course not found");
         return new CourseGetDto
         {
             Id = saved.Id,
@@ -80,7 +81,7 @@ public class CourseService : ICourseService
     public async Task<CourseGetDto?> DeleteAsync(int id)
     {
         var deleted = await _courseRepository.DeleteAsync(id);
-        if (deleted == null) return null;
+        if (deleted == null) throw new NotFoundException("Course not found");
         return new CourseGetDto
         {
             Id = deleted.Id,

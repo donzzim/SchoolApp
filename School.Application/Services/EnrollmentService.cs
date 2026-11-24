@@ -1,3 +1,4 @@
+using School.Application.Exceptions;
 using School.Application.DTO.SchoolClass;
 using School.Application.DTO.Enrollment;
 using School.Application.DTO.User;
@@ -18,10 +19,7 @@ public class EnrollmentService : IEnrollmentService
     public async Task<EnrollmentGetDetailDto?> GetByIdAsync(int id)
     {
         var enrollment = await _enrollmentRepository.GetByIdAsync(id);
-        if (enrollment == null)
-        {
-            return null;
-        }
+        if (enrollment == null) throw new NotFoundException("Enrollment not found");
 
         return new EnrollmentGetDetailDto
         {
@@ -95,6 +93,9 @@ public class EnrollmentService : IEnrollmentService
 
     public async Task<EnrollmentGetDto?> UpdateAsync(EnrollmentPutDto dto)
     {
+        var existingEnrollment = await _enrollmentRepository.GetByIdAsync(dto.Id);
+        if (existingEnrollment == null) throw new NotFoundException("Enrollment not found");
+
         var enrollment = new Enrollment
         {
             Id = dto.Id,
@@ -102,7 +103,7 @@ public class EnrollmentService : IEnrollmentService
             ExpirationDate = dto.ExpirationDate,
         };
         var updatedEnrollment = await _enrollmentRepository.UpdateAsync(enrollment);
-        if (updatedEnrollment == null) return null;
+        if (updatedEnrollment == null) throw new NotFoundException("Enrollment not found");
         return new EnrollmentGetDto
         {
             Id = updatedEnrollment.Id,
@@ -117,10 +118,7 @@ public class EnrollmentService : IEnrollmentService
     public async Task<EnrollmentGetDto?> DeleteAsync(int id)
     {
         var deletedEnrollment = await _enrollmentRepository.DeleteAsync(id);
-        if (deletedEnrollment == null)
-        {
-            return null;
-        }
+        if (deletedEnrollment == null) throw new NotFoundException("Enrollment not found");
 
         return new EnrollmentGetDto
         {
